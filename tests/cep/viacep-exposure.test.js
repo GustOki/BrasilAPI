@@ -1,7 +1,4 @@
-// ...existing code...
 const path = require('path');
-
-// Ajuste do require para carregar o serviço a partir da raiz do repositório
 const cepService = require(path.resolve(__dirname, '../../services/cep'));
 
 describe('Ciclo 1 — ViaCEP expondo mensagens internas (RED)', () => {
