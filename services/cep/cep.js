@@ -1,77 +1,34 @@
 import axios from 'axios';
-import cepPromise from 'cep-promise';
+import { fetchCep } from '../../services/cep/cep';
 
-const providers = ['correios', 'viacep', 'widenet', 'correios-alt'];
+jest.mock('axios');
+jest.mock('cep-promise');
 
-const CEP_LENGTH = 8;
-const DEFAULT_TIMEOUT = 3 * 1000;
-
-function onlyDigits(cep) {
-  return cep.replace(/\D/g, '');
-}
-
-function isValidCep(cep) {
-  const cleanCep = onlyDigits(cep);
-  return cleanCep.length === CEP_LENGTH;
-}
-
-async function fetchOpenCep(cep) {
-  const { data } = await axios.get(`https://opencep.com/v1/${cep}`, {
-    timeout: DEFAULT_TIMEOUT,
+describe('Ciclo 1 — ViaCEP Exposure: "Cannot read properties of undefined"', () => {
+  
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  return {
-    cep: onlyDigits(data.cep),
-    state: data.uf,
-    city: data.localidade,
-    neighborhood: data.bairro,
-    street: data.logradouro,
-    service: 'open-cep',
-  };
-}
+  it('should handle ViaCEP undefined error and return standardized CepPromiseError', async () => {
+    axios.get.mockRejectedValueOnce(
+      new TypeError("Cannot read properties of undefined (reading 'replace')")
+    );
 
-async function updateOpenCep(cep) {
-  await axios.get(`https://update.opencep.com/${cep}`, {
-    timeout: DEFAULT_TIMEOUT,
+    try {
+      await fetchCep('002123-25');
+      expect(true).toBe(false);
+    } catch (error) {
+      expect(error).toBeDefined();
+      
+      expect(error.message).not.toContain('Cannot read properties');
+      expect(error.message).not.toContain('reading');
+      expect(error.message).not.toContain('undefined');
+      
+      expect(error.message).toMatch(/CEP|caracteres|validation/i);
+      
+      expect(error.type).toBeDefined();
+      expect(error.errors).toBeDefined();
+    }
   });
-}
-
-class CepPromiseError extends Error {
-  constructor({ message, type, errors } = {}) {
-    super();
-
-    this.name = 'CepPromiseError';
-    this.message = message;
-    this.type = type;
-    this.errors = errors;
-  }
-}
-
-export async function fetchCep(cep) {
-  if (!isValidCep(cep)) {
-    throw new CepPromiseError({
-      message: `CEP deve conter exatamente ${CEP_LENGTH} caracteres.`,
-      type: 'validation_error',
-      errors: [
-        {
-          message: `CEP informado possui mais do que ${CEP_LENGTH} caracteres.`,
-          service: 'cep_validation',
-        },
-      ],
-    });
-  }
-
-  const cleanCep = onlyDigits(cep);
-
-  const fetchCepPromise = () =>
-    cepPromise(cleanCep, {
-      providers,
-    });
-
-  return fetchOpenCep(cleanCep).catch(() =>
-    fetchCepPromise().then(async (data) => {
-      await updateOpenCep(cleanCep).catch(() => {});
-      return data;
-    })
-  );
-}
+});
